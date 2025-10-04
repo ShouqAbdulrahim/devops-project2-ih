@@ -32,3 +32,6 @@ yarn-error.log*
 *.sql
 ansible/*
 infra/*
+# Ansible secrets (keep local or use Vault)
+ansible/inventories/group_vars/backend.yml
+ansible/inventories/group_vars/*.vault
