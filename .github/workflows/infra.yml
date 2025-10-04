@@ -1,0 +1,35 @@
+name: Infra - Terraform
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'infra/**'
+jobs:
+  tf:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init/Plan
+        working-directory: infra
+        run: |
+          terraform init -input=false
+          terraform plan  -out=tfplan -input=false
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: infra
+        run: terraform apply -input=false -auto-approve tfplan
