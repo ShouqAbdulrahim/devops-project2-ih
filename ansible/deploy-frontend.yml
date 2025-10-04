@@ -1,0 +1,41 @@
+---
+- name: Deploy Frontend App
+  hosts: frontend
+  become: yes
+  tasks:
+    - name: Ensure Node.js and npm are installed
+      apt:
+        name: ["nodejs", "npm"]
+        state: present
+        update_cache: yes
+
+    - name: Copy frontend folder to VM
+      synchronize:
+        src: ../frontend/
+        dest: /home/azureuser/frontend/
+        recursive: yes
+
+    - name: Install frontend dependencies
+      command: npm install
+      args:
+        chdir: /home/azureuser/frontend/
+
+    - name: Build frontend app
+      command: npm run build
+      args:
+        chdir: /home/azureuser/frontend/
+
+    - name: Copy built files to Nginx web root
+      copy:
+        src: /home/azureuser/frontend/dist/
+        dest: /var/www/html/
+        owner: www-data
+        group: www-data
+        mode: '0755'
+      notify: Restart Nginx
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
