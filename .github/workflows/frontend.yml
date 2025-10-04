@@ -1,0 +1,43 @@
+name: Frontend - Build & Deploy
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install & Build
+        working-directory: frontend
+        run: |
+          npm ci || npm install
+          npm run build
+
+      - name: Sync dist to Frontend VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.FRONTEND_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "frontend/dist/*"
+          target: "/home/${{ secrets.SSH_USER }}/deploy_dist/"
+
+      - name: Move to /var/www/html and reload Nginx
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.FRONTEND_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo rm -rf /var/www/html/*
+            sudo cp -r ~/deploy_dist/* /var/www/html/
+            sudo nginx -t && sudo systemctl reload nginx
