@@ -35,3 +35,9 @@ infra/*
 # Ansible secrets (keep local or use Vault)
 ansible/inventories/group_vars/backend.yml
 ansible/inventories/group_vars/*.vault
+frontend/dist/
+backend/target/
+**/*.log
+app.log
+backend/src/main/resources/application.properties
+ansible/vars/secure.yml

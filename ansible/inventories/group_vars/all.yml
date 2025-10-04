@@ -1,3 +1,4 @@
 project_name: devops-proj2-shouq
 backend_port: 8080
+repo_root: /home/azureuser/devops-project2-ih
 frontend_root: /var/www/html

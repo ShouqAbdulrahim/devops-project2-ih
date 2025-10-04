@@ -1,2 +1,5 @@
-backend_private_ip: "10.30.2.4"
+repo_root: /home/azureuser/devops-project2-ih 
+frontend_root: /var/www/html 
+backend_private_ip: 10.30.2.4
+backend_port: 8080
 

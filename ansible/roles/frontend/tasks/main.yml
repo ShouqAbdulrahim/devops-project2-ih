@@ -1,43 +1,80 @@
 ---
-- name: Install NodeSource setup (for Node 20)
-  get_url:
-    url: https://deb.nodesource.com/setup_20.x
-    dest: /tmp/nodesource.sh
-    mode: '0755'
+# roles/frontend/tasks/main.yml
 
-- name: Run NodeSource setup
-  command: bash /tmp/nodesource.sh
-
-- name: Install nodejs and nginx
+- name: Ensure prerequisites (apt, curl, gpg)
   apt:
     name:
-      - nodejs
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
       - nginx
     state: present
     update_cache: yes
 
-- name: Build frontend (npm ci && npm run build)
+# فحص إن كان Node موجود
+- name: Check if node is installed
+  command: node -v
+  register: node_version
+  failed_when: false
+  changed_when: false
+
+# إضافة مفتاح ومخزن NodeSource فقط إذا Node غير مثبت
+- name: Add NodeSource GPG key
   shell: |
     set -e
-    npm ci
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o /etc/apt/keyrings/nodesource.gpg
+    chmod a+r /etc/apt/keyrings/nodesource.gpg
+  when: node_version.rc != 0
+
+- name: Add NodeSource repo (Node 20.x)
+  shell: |
+    set -e
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update -y
+  args:
+    executable: /bin/bash
+  when: node_version.rc != 0
+
+- name: Ensure nodejs is installed
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+# بناء الفرونت داخل الريبو
+- name: Build frontend (npm ci/install && npm run build)
+  shell: |
+    set -e
+    if [ -f package-lock.json ]; then npm ci; else npm install; fi
     npm run build
   args:
     chdir: "{{ repo_root }}/frontend"
+    executable: /bin/bash
+  environment:
+    CI: "true"
 
-- name: Clean web root
+# تجهير مجلد الويب ونسخ الـ dist
+- name: Ensure web root exists
+  become: yes
   file:
     path: "{{ frontend_root }}"
     state: directory
+    owner: www-data
+    group: www-data
     mode: '0755'
-  notify: restart nginx
 
-- name: Sync dist to web root
-  synchronize:
+- name: Deploy built files (copy from remote dist/ to web root)
+  become: yes
+  copy:
     src: "{{ repo_root }}/frontend/dist/"
     dest: "{{ frontend_root }}/"
-    delete: yes
-    recursive: yes
-
+    owner: www-data
+    group: www-data
+    mode: '0644'
+    remote_src: yes
+# تفعيل إعداد Nginx
 - name: Render Nginx site
   template:
     src: nginx-site.conf.j2
@@ -50,10 +87,3 @@
     name: nginx
     state: started
     enabled: yes
-
-# Handlers
-- name: restart nginx
-  listen: restart nginx
-  systemd:
-    name: nginx
-    state: restarted
