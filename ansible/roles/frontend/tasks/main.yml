@@ -1,0 +1,59 @@
+---
+- name: Install NodeSource setup (for Node 20)
+  get_url:
+    url: https://deb.nodesource.com/setup_20.x
+    dest: /tmp/nodesource.sh
+    mode: '0755'
+
+- name: Run NodeSource setup
+  command: bash /tmp/nodesource.sh
+
+- name: Install nodejs and nginx
+  apt:
+    name:
+      - nodejs
+      - nginx
+    state: present
+    update_cache: yes
+
+- name: Build frontend (npm ci && npm run build)
+  shell: |
+    set -e
+    npm ci
+    npm run build
+  args:
+    chdir: "{{ repo_root }}/frontend"
+
+- name: Clean web root
+  file:
+    path: "{{ frontend_root }}"
+    state: directory
+    mode: '0755'
+  notify: restart nginx
+
+- name: Sync dist to web root
+  synchronize:
+    src: "{{ repo_root }}/frontend/dist/"
+    dest: "{{ frontend_root }}/"
+    delete: yes
+    recursive: yes
+
+- name: Render Nginx site
+  template:
+    src: nginx-site.conf.j2
+    dest: /etc/nginx/sites-available/default
+    mode: '0644'
+  notify: restart nginx
+
+- name: Ensure nginx is enabled and running
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+# Handlers
+- name: restart nginx
+  listen: restart nginx
+  systemd:
+    name: nginx
+    state: restarted

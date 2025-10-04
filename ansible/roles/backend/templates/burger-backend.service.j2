@@ -1,0 +1,15 @@
+[Unit]
+Description=Burger Builder Backend (Spring Boot)
+After=network.target
+
+[Service]
+User=azureuser
+WorkingDirectory={{ app_dir }}
+EnvironmentFile=/etc/burger-backend.env
+ExecStart=/usr/bin/java -jar {{ app_dir }}/{{ jar_name }}
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+- hosts: all
+  gather_facts: yes
+  roles:
+    - common
+
+- hosts: backend
+  roles:
+    - backend
+
+- hosts: frontend
+  roles:
+    - frontend

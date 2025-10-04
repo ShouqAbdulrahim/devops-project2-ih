@@ -1,0 +1,60 @@
+---
+- name: Install Java 21 and Maven
+  apt:
+    name:
+      - openjdk-21-jre
+      - maven
+    state: present
+
+- name: Create app directory
+  file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: azureuser
+    group: azureuser
+    mode: '0755'
+
+- name: Build backend with Maven (skip tests)
+  command: mvn -q -DskipTests package
+  args:
+    chdir: "{{ repo_root }}/backend"
+
+- name: Copy JAR to app_dir
+  copy:
+    src: "{{ repo_root }}/backend/target/{{ jar_name }}"
+    dest: "{{ app_dir }}/{{ jar_name }}"
+    mode: '0755'
+    owner: azureuser
+    group: azureuser
+
+- name: Render env file for backend
+  template:
+    src: burger-backend.env.j2
+    dest: /etc/burger-backend.env
+    mode: '0640'
+
+- name: Render systemd unit
+  template:
+    src: burger-backend.service.j2
+    dest: /etc/systemd/system/burger-backend.service
+    mode: '0644'
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Enable & start backend service
+  systemd:
+    name: burger-backend
+    state: started
+    enabled: yes
+
+- name: Wait for backend to be up
+  uri:
+    url: "http://localhost:{{ backend_port }}/api/health"
+    return_content: yes
+    status_code: 200
+  register: health
+  retries: 12
+  delay: 5
+  until: health.status == 200
