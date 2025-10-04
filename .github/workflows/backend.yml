@@ -1,0 +1,41 @@
+name: Backend - Build & Deploy
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'backend/**'
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build (skip tests)
+        working-directory: backend
+        run: mvn -q -DskipTests package
+
+      - name: Copy JAR to backend VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.BACKEND_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "backend/target/burger-builder-backend-1.0.0.jar"
+          target: "/home/${{ secrets.SSH_USER }}/app/"
+
+      - name: Restart systemd service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BACKEND_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo systemctl restart burger-backend
+            sudo systemctl status burger-backend --no-pager || true
