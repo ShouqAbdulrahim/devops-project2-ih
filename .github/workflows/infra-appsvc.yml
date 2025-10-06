@@ -1,0 +1,47 @@
+name: Infra — Terraform (App Service)
+on:
+  push:
+    paths:
+      - 'infra/terraform_appsvc/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  tf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init/Plan
+        working-directory: infra/terraform_appsvc
+        run: |
+          terraform init -input=false
+          terraform plan -out=tfplan -input=false \
+            -var "project_name=devops-proj2-shouqds" \
+            -var "rg_name=<RG_NAME>" \
+            -var "vnet_rg=<VNET_RG>" \
+            -var "vnet_name=<VNET_NAME>" \
+            -var "subnet_apps=<SUBNET_FOR_APPS>" \
+            -var "sql_hostname=<SQL_PRIVATELINK_FQDN>" \
+            -var "sql_db_name=<DB_NAME>" \
+            -var "sql_user=<USER>" \
+            -var "sql_password=${{ secrets.SQL_PASSWORD }}" \
+            -var "appgw_public_ip=<APPGW_PUBLIC_IP>"
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: infra/terraform_appsvc
+        run: terraform apply -input=false -auto-approve tfplan
