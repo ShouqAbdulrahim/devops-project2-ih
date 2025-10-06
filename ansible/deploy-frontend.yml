@@ -1,41 +1,108 @@
 ---
 - name: Deploy Frontend App
   hosts: frontend
-  become: yes
+  become: true
+  vars:
+    repo_root: "/home/azureuser/devops-project2-ih"
+    frontend_dir: "{{ repo_root }}/frontend"
+    deploy_root: "/var/www/html"
+    appgw_url: "http://20.225.212.138"
+    backend_upstream: "10.30.2.4:8080"
   tasks:
-    - name: Ensure Node.js and npm are installed
+    - name: Ensure base packages
       apt:
-        name: ["nodejs", "npm"]
+        name: [nginx, jq, rsync, ca-certificates, curl, gnupg]
         state: present
         update_cache: yes
+      notify: restart nginx
 
-    - name: Copy frontend folder to VM
-      synchronize:
-        src: ../frontend/
-        dest: /home/azureuser/frontend/
-        recursive: yes
-
-    - name: Install frontend dependencies
-      command: npm install
+    - name: Install Node.js repo (Node 18.x)
+      shell: curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
       args:
-        chdir: /home/azureuser/frontend/
+        creates: /etc/apt/sources.list.d/nodesource.list
 
-    - name: Build frontend app
-      command: npm run build
-      args:
-        chdir: /home/azureuser/frontend/
+    - name: Install nodejs
+      apt:
+        name: nodejs
+        state: present
 
-    - name: Copy built files to Nginx web root
+    - name: Create .env.production
       copy:
-        src: /home/azureuser/frontend/dist/
-        dest: /var/www/html/
+        dest: "{{ frontend_dir }}/.env.production"
+        mode: "0644"
+        content: |
+          VITE_API_BASE_URL={{ appgw_url }}
+
+    - name: Frontend build (npm ci && npm run build)
+      shell: |
+        set -e
+        npm ci
+        npm run build
+      args:
+        chdir: "{{ frontend_dir }}"
+      register: build_out
+      changed_when: "'built in' in build_out.stdout or 'added' in build_out.stdout"
+
+    - name: Ensure deploy root
+      file:
+        path: "{{ deploy_root }}"
+        state: directory
         owner: www-data
         group: www-data
-        mode: '0755'
-      notify: Restart Nginx
+        mode: "0755"
+
+    - name: Deploy dist → Nginx root
+      synchronize:
+        src: "{{ frontend_dir }}/dist/"
+        dest: "{{ deploy_root }}/"
+        delete: yes
+        recursive: yes
+
+    - name: Install nginx site
+      copy:
+        dest: /etc/nginx/sites-available/app.conf
+        mode: "0644"
+        content: |
+          server {
+            listen 80 default_server;
+            server_name _;
+            root {{ deploy_root }};
+            index index.html;
+
+            location / {
+              try_files $uri /index.html;
+            }
+
+            location /api/ {
+              proxy_pass http://{{ backend_upstream }};
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_http_version 1.1;
+              proxy_read_timeout 60s;
+            }
+          }
+      notify: reload nginx
+
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/app.conf
+        dest: /etc/nginx/sites-enabled/app.conf
+        state: link
+      notify: reload nginx
+
+    - name: Disable default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: Validate nginx
+      command: nginx -t
+      changed_when: false
 
   handlers:
-    - name: Restart Nginx
-      service:
-        name: nginx
-        state: restarted
+    - name: reload nginx
+      service: { name: nginx, state: reloaded }
+    - name: restart nginx
+      service: { name: nginx, state: restarted }

@@ -1,7 +1,7 @@
 db_server_fqdn: "devops-proj2-shouq-sqlsrv.database.windows.net"
 db_name: "devops-proj2-shouq-db"
 db_user: "sqladminuser"
-db_password: "P@ssword123!"  # يفضّل لاحقاً من Key Vault أو Ansible Vault
+db_password: "P@ssword123!" 
 spring_active_profile: "azure"
 app_dir: /opt/burger-backend
 jar_name: burger-builder-backend-1.0.0.jar

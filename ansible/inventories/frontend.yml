@@ -1,2 +1,10 @@
-backend_private_ip: "10.30.2.4"
+node_major: 18
+repo_root: /home/azureuser/devops-project2-ih
+frontend_root: /var/www/html
+
+# Backend بالبوابة العامة (AppGW)
+appgw_url: 20.225.212.138
+backend_private_ip: 10.30.2.4
+backend_port: 8080
+
 

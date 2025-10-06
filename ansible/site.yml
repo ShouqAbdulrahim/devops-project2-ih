@@ -1,12 +1,26 @@
-- hosts: all
+---
+- name: Base hardening & prerequisites
+  hosts: all
   gather_facts: yes
+  become: true
+  serial: 1
   roles:
-    - common
+    - { role: common, tags: ["common"] }
 
-- hosts: backend
+- name: Deploy backend
+  hosts: backend
+  gather_facts: yes
+  become: true
+  serial: 1
   roles:
-    - backend
+    - { role: backend, tags: ["backend"] }
 
-- hosts: frontend
+- name: Deploy frontend
+  hosts: frontend
+  gather_facts: yes
+  become: true
+  serial: 1
   roles:
-    - frontend
+    - { role: frontend, tags: ["frontend"] }
+
+

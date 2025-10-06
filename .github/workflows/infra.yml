@@ -28,7 +28,10 @@ jobs:
         run: |
           terraform init -input=false
           terraform plan  -out=tfplan -input=false
-
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        working-directory: infra
+        run: terraform apply -input=false -auto-approve tfplan
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         working-directory: infra

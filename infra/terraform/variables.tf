@@ -16,6 +16,11 @@ variable "address_space" {
   default     = ["10.20.0.0/16"]
 }
 
+  variable "appgw_id"        { type = string }
+  variable "vm_frontend_id"  { type = string }
+  variable "vm_backend_id"   { type = string }
+  variable "sql_db_id"       { type = string }
+
 variable "subnets" {
   description = "project2 - SDA "
   type = map(object({
@@ -29,4 +34,7 @@ variable "subnets" {
     mgmt     = { cidr = "10.20.10.0/24" }
     bastion  = { cidr = "10.20.100.0/27" }
   }
+
+
+
 }
