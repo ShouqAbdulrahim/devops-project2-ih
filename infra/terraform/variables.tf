@@ -34,10 +34,10 @@ variable "subnets" {
     mgmt     = { cidr = "10.20.10.0/24" }
     bastion  = { cidr = "10.20.100.0/27" }
   }
-  variable "ssh_public_key" {
+   variable "ssh_public_key" {
   description = "Admin SSH public key (OpenSSH format)"
   type        = string
-}
+  }
 
 
 }
