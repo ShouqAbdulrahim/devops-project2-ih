@@ -3,6 +3,11 @@ variable "project_name" {
   description = "Project2 - SDA"
   default     = "devops-proj2-shouqds"
 }
+variable "admin_username" {
+  description = "Admin username for the virtual machines"
+  type        = string
+  default     = "azureuser"
+}
 
 variable "location" {
   type        = string
