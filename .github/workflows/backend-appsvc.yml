@@ -1,0 +1,39 @@
+name: Backend — App Service Deploy
+on:
+  push:
+    paths:
+      - 'apps/backend/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Maven build
+        working-directory: apps/backend
+        run: mvn -DskipTests package
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id: ${{ secrets.ARM_TENANT_ID }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Deploy JAR to Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.BACKEND_APPNAME }}
+          package: apps/backend/target/*.jar
