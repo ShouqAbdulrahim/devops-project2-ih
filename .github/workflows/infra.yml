@@ -15,6 +15,12 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      # ⬇️ توليد مفتاح مؤقت
+      - name: Generate SSH key (ephemeral)
+        run: |
+          ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
+          echo "TF_VAR_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
+
       - name: Terraform Init
         working-directory: infra/terraform
         run: terraform init
@@ -23,12 +29,7 @@ jobs:
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-          
-      - name: Generate SSH key (ephemeral)
-         run: |
-            ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
-            echo "TF_VAR_ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
-            
+
       - name: Terraform Plan
         working-directory: infra/terraform
         run: terraform plan -out=tfplan
