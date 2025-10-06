@@ -1,22 +1,20 @@
 name: Infra - Terraform
-
 on:
-  workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
-      - 'infra/**'
+      - "infra/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   tf:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write    # مطلوب لـ OIDC
-      contents: read
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -33,11 +31,10 @@ jobs:
         run: terraform init -input=false
 
       - name: Terraform Plan
-        id: plan
         working-directory: infra
-        run: terraform plan -input=false -out=tfplan
+        run: terraform plan -out=tfplan -input=false
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         working-directory: infra
         run: terraform apply -input=false -auto-approve tfplan
