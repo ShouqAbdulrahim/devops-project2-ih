@@ -1,28 +1,22 @@
 name: Infra - Terraform
-
 on:
   push:
     branches: [ "main" ]
     paths:
-      - "infra/**"
+      - "infra/terraform/**"
   workflow_dispatch:
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
     steps:
-      # نسحب الكود من المستودع
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # نثبت Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # Terraform Init
       - name: Terraform Init
-        working-directory: infra
+        working-directory: infra/terraform
         run: terraform init
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -30,9 +24,8 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
-      # Terraform Plan
       - name: Terraform Plan
-        working-directory: infra
+        working-directory: infra/terraform
         run: terraform plan -out=tfplan
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -40,10 +33,9 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
-      # Terraform Apply (يتنفذ فقط لما تكوني على فرع main وتستدعي workflow يدوي)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
-        working-directory: infra
+        working-directory: infra/terraform
         run: terraform apply -auto-approve tfplan
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
