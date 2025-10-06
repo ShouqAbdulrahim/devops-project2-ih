@@ -1,4 +1,5 @@
 name: Infra - Terraform
+
 on:
   push:
     branches: [ "main" ]
@@ -6,35 +7,46 @@ on:
       - "infra/**"
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
-  tf:
+  terraform:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      # نسحب الكود من المستودع
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
+      # نثبت Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      # Terraform Init
       - name: Terraform Init
         working-directory: infra
-        run: terraform init -input=false
+        run: terraform init
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
+      # Terraform Plan
       - name: Terraform Plan
         working-directory: infra
-        run: terraform plan -out=tfplan -input=false
+        run: terraform plan -out=tfplan
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
+      # Terraform Apply (يتنفذ فقط لما تكوني على فرع main وتستدعي workflow يدوي)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         working-directory: infra
-        run: terraform apply -input=false -auto-approve tfplan
+        run: terraform apply -auto-approve tfplan
+        env:
+          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
