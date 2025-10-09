@@ -102,7 +102,10 @@ jobs:
           ADDR+=("azurerm_linux_virtual_machine.vm_mgmt");     IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-mgmt")
           ADDR+=("azurerm_linux_virtual_machine.vm_frontend"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-frontend")
           ADDR+=("azurerm_linux_virtual_machine.vm_backend");  IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-backend")
+           # --- AGW Backend Pool associations (NIC ipconfig1 <-> AGW pools) ---
+          ADDR+=("azurerm_network_interface_application_gateway_backend_address_pool_association.frontend_assoc")IDS+=('/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/networkInterfaces/devops-proj2-shouq-nic-frontend/ipConfigurations/ipconfig1|/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/applicationGateways/devops-proj2-shouq-appgw/backendAddressPools/frontend-pool')
 
+          ADDR+=("azurerm_network_interface_application_gateway_backend_address_pool_association.backend_assoc")IDS+=('/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/networkInterfaces/devops-proj2-shouq-nic-backend/ipConfigurations/ipconfig1|/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/applicationGateways/devops-proj2-shouq-appgw/backendAddressPools/backend-pool')
           # --- Private DNS A Record ---
           ADDR+=("azurerm_private_dns_a_record.sqlrecord"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/A/devops-proj2-shouq-sqlsrv")
 
