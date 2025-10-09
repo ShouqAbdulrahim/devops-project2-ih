@@ -78,7 +78,9 @@ jobs:
           ADDR+=("azurerm_network_security_rule.allow_backend_to_sql");         IDS+=("$(nsg_id nsg-data-shouq)/securityRules/allow_backend_to_sql")
 
           # --- Subnet<->NSG Associations (المعرّف = "<SUBNET_ID>|<NSG_ID>") ---
-          ADDR+=("azurerm_subnet_network_security_group_association.assoc_frontend"); IDS+=("$(sn_id snet-frontend)|$(nsg_id nsg-frontend-shouq)")
+          # مثال واحد
+          ADDR+=("azurerm_subnet_network_security_group_association.assoc_frontend")
+          IDS+=('/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/virtualNetworks/devops-proj2-shouq-vnet/subnets/snet-frontend|/subscriptions/'"${ARM_SUBSCRIPTION_ID}"'/resourceGroups/devops-proj2-shouq-rg/providers/Microsoft.Network/networkSecurityGroups/nsg-frontend-shouq')
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_backend");  IDS+=("$(sn_id snet-backend)|$(nsg_id nsg-backend-shouq)")
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_data");     IDS+=("$(sn_id snet-data)|$(nsg_id nsg-data-shouq)")
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_mgmt");     IDS+=("$(sn_id snet-mgmt)|$(nsg_id nsg-mgmt-shouq)")
