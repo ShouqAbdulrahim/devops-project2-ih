@@ -14,15 +14,15 @@ locals {
 resource "azurerm_virtual_network" "vnet" {
   name                = local.vnet_name
   address_space       = var.address_space
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  resource_group_name = local.rg_name
 }
 
 # Subnets (من الخريطة)
 resource "azurerm_subnet" "snet" {
   for_each             = var.subnets
   name                 = each.key == "bastion" ? "AzureBastionSubnet" : "snet-${each.key}"
-  resource_group_name  = azurerm_resource_group.rg.name
+  resource_group_name  = local.rg_name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = [each.value.cidr]
 }
