@@ -23,8 +23,7 @@ jobs:
       - name: Install & Build
         working-directory: frontend
         env:
-          CI: true
-          NODE_ENV: production
+          CI: true               # ← لا نحدد NODE_ENV هنا
         run: |
           if [ -f package-lock.json ]; then
             npm ci
@@ -33,19 +32,15 @@ jobs:
           fi
           npm run build
 
-      # ارفع المخرجات لمجلد مؤقت على السيرفر
       - name: Sync dist to Frontend VM (staging dir)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.FRONTEND_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          # اختياري: port: 22
           source: "frontend/dist/*"
           target: "/home/${{ secrets.SSH_USER }}/deploy_dist/"
-          # اختياري: rm: true  # يحذف الهدف قبل النسخ (حذرًا)
 
-      # تحريك ذرّي + فحص Nginx
       - name: Move to /var/www/html and reload Nginx
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -55,7 +50,6 @@ jobs:
           script: |
             set -e
             sudo mkdir -p /var/www/html
-            # انسخ إلى مجلد مؤقت ثم بدّل دفعة وحدة
             sudo rm -rf /var/www/html_new
             sudo mkdir -p /var/www/html_new
             sudo cp -r ~/deploy_dist/* /var/www/html_new/
@@ -63,5 +57,4 @@ jobs:
             sudo mv /var/www/html_new /var/www/html
             sudo nginx -t
             sudo systemctl reload nginx
-            # تنظيف قديم اختياري
             sudo rm -rf /var/www/html_old || true
