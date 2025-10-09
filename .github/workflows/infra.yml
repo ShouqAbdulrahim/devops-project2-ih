@@ -10,13 +10,21 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    env:
+      # 🟡 عدّلي اسم RG هنا ليتطابق مع local.rg_name = "${var.project_name}-rg"
+      RG_NAME: devops-proj2-shouq-rg
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # ⬇️ توليد مفتاح مؤقت
+      # ⬇️ توليد مفتاح مؤقت وتمريره كـ TF_VAR
       - name: Generate SSH key (ephemeral)
         run: |
           ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
@@ -24,45 +32,24 @@ jobs:
 
       - name: Terraform Init
         working-directory: infra/terraform
-        run: terraform init
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        run: terraform init -input=false
 
       - name: Terraform Import Resource Group (idempotent)
         working-directory: infra/terraform
         run: |
-          # لو الموارد موجودة في الـ state، تجاهلي الـ import
           if terraform state show azurerm_resource_group.rg > /dev/null 2>&1; then
             echo "RG already in state. Skipping import."
           else
             terraform import \
               azurerm_resource_group.rg \
-              /subscriptions/${{ secrets.ARM_SUBSCRIPTION_ID }}/resourceGroups/devops-proj2-shouq-rg
+              /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}
           fi
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
       - name: Terraform Plan
         working-directory: infra/terraform
-        run: terraform plan -out=tfplan
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        run: terraform plan -out=tfplan -input=false
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         working-directory: infra/terraform
-        run: terraform apply -auto-approve tfplan
-        env:
-          ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
-          ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
-          ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+        run: terraform apply -auto-approve -input=false tfplan
