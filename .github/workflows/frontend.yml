@@ -1,4 +1,5 @@
 name: Frontend - Build & Deploy
+
 on:
   workflow_dispatch:
   push:
@@ -8,6 +9,7 @@ on:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -15,22 +17,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Install & Build
         working-directory: frontend
+        env:
+          CI: true
+          NODE_ENV: production
         run: |
-          npm ci || npm install
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
           npm run build
 
-      - name: Sync dist to Frontend VM
+      # ارفع المخرجات لمجلد مؤقت على السيرفر
+      - name: Sync dist to Frontend VM (staging dir)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.FRONTEND_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          # اختياري: port: 22
           source: "frontend/dist/*"
           target: "/home/${{ secrets.SSH_USER }}/deploy_dist/"
+          # اختياري: rm: true  # يحذف الهدف قبل النسخ (حذرًا)
 
+      # تحريك ذرّي + فحص Nginx
       - name: Move to /var/www/html and reload Nginx
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -38,6 +53,15 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            sudo rm -rf /var/www/html/*
-            sudo cp -r ~/deploy_dist/* /var/www/html/
-            sudo nginx -t && sudo systemctl reload nginx
+            set -e
+            sudo mkdir -p /var/www/html
+            # انسخ إلى مجلد مؤقت ثم بدّل دفعة وحدة
+            sudo rm -rf /var/www/html_new
+            sudo mkdir -p /var/www/html_new
+            sudo cp -r ~/deploy_dist/* /var/www/html_new/
+            sudo mv /var/www/html /var/www/html_old || true
+            sudo mv /var/www/html_new /var/www/html
+            sudo nginx -t
+            sudo systemctl reload nginx
+            # تنظيف قديم اختياري
+            sudo rm -rf /var/www/html_old || true
