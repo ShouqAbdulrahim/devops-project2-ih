@@ -11,7 +11,6 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     env:
-      # 🟡 عدّلي اسم RG هنا ليتطابق مع local.rg_name = "${var.project_name}-rg"
       RG_NAME: devops-proj2-shouq-rg
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
       ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
@@ -24,7 +23,6 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      # ⬇️ توليد مفتاح مؤقت وتمريره كـ TF_VAR
       - name: Generate SSH key (ephemeral)
         run: |
           ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
@@ -34,16 +32,37 @@ jobs:
         working-directory: infra/terraform
         run: terraform init -input=false
 
-      - name: Terraform Import Resource Group (idempotent)
+      - name: Terraform Batch Import (idempotent)
         working-directory: infra/terraform
         run: |
-          if terraform state show azurerm_resource_group.rg > /dev/null 2>&1; then
-            echo "RG already in state. Skipping import."
-          else
-            terraform import \
-              azurerm_resource_group.rg \
-              /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}
-          fi
+          set -e
+          SUB="/subscriptions/${ARM_SUBSCRIPTION_ID}"
+          RG="${RG_NAME}"
+
+          IMPORTS=(
+            "azurerm_resource_group.rg;${SUB}/resourceGroups/${RG}"
+            "azurerm_virtual_network.vnet;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/devops-proj2-shouq-vnet"
+            "azurerm_public_ip.bastion_pip;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-bastion-pip"
+            "azurerm_public_ip.appgw_pip;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-appgw-pip"
+            "azurerm_network_security_group.nsg_frontend;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-frontend-shouq"
+            "azurerm_network_security_group.nsg_backend;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-backend-shouq"
+            "azurerm_network_security_group.nsg_data;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-data-shouq"
+            "azurerm_network_security_group.nsg_mgmt;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-mgmt-shouq"
+            "azurerm_mssql_server.sqlserver;${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/devops-proj2-shouq-sqlsrv"
+            "azurerm_private_dns_zone.sqlzone;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net"
+            "azurerm_web_application_firewall_policy.wafpolicy;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGatewayWebApplicationFirewallPolicies/devops-proj2-shouq-waf-policy"
+          )
+
+          for pair in "${IMPORTS[@]}"; do
+            addr="${pair%%;*}"
+            id="${pair#*;}"
+            if terraform state show "$addr" >/dev/null 2>&1; then
+              echo "✓ $addr already in state"
+            else
+              echo "→ Importing $addr"
+              terraform import "$addr" "$id"
+            fi
+          done
 
       - name: Terraform Plan
         working-directory: infra/terraform
