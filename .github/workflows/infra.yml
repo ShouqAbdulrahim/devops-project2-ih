@@ -31,11 +31,17 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
-      - name: Terraform Import Resource Group
+      - name: Terraform Import Resource Group (idempotent)
         working-directory: infra/terraform
         run: |
-          terraform import azurerm_resource_group.rg \
-            /subscriptions/${{ secrets.ARM_SUBSCRIPTION_ID }}/resourceGroups/my-existing-rg || true
+          # لو الموارد موجودة في الـ state، تجاهلي الـ import
+          if terraform state show azurerm_resource_group.rg > /dev/null 2>&1; then
+            echo "RG already in state. Skipping import."
+          else
+            terraform import \
+              azurerm_resource_group.rg \
+              /subscriptions/${{ secrets.ARM_SUBSCRIPTION_ID }}/resourceGroups/devops-proj2-shouq-rg
+          fi
         env:
           ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
           ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
