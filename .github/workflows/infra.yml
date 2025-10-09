@@ -32,30 +32,89 @@ jobs:
         working-directory: infra/terraform
         run: terraform init -input=false
 
-      - name: Terraform Batch Import (idempotent)
+      - name: Terraform Batch Import (idempotent - extended)
         working-directory: infra/terraform
         run: |
           set -e
           SUB="/subscriptions/${ARM_SUBSCRIPTION_ID}"
-          RG="${RG_NAME}"
+          RG="devops-proj2-shouq-rg"
+          VNET="devops-proj2-shouq-vnet"
+          SQLSRV="devops-proj2-shouq-sqlsrv"
+          SQLDB="devops-proj2-shouq-db"
 
-          IMPORTS=(
-            "azurerm_resource_group.rg;${SUB}/resourceGroups/${RG}"
-            "azurerm_virtual_network.vnet;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/devops-proj2-shouq-vnet"
-            "azurerm_public_ip.bastion_pip;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-bastion-pip"
-            "azurerm_public_ip.appgw_pip;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-appgw-pip"
-            "azurerm_network_security_group.nsg_frontend;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-frontend-shouq"
-            "azurerm_network_security_group.nsg_backend;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-backend-shouq"
-            "azurerm_network_security_group.nsg_data;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-data-shouq"
-            "azurerm_network_security_group.nsg_mgmt;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-mgmt-shouq"
-            "azurerm_mssql_server.sqlserver;${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/devops-proj2-shouq-sqlsrv"
-            "azurerm_private_dns_zone.sqlzone;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net"
-            "azurerm_web_application_firewall_policy.wafpolicy;${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGatewayWebApplicationFirewallPolicies/devops-proj2-shouq-waf-policy"
-          )
+          # NOTE: لعناوين for_each نستخدم صيغة azurerm_subnet.snet["key"]
+          # وعلشان الباش ما يلخبط الأقواس، نعرّفها كسلاسل ثم نمرّرها كمتغيرات.
 
-          for pair in "${IMPORTS[@]}"; do
-            addr="${pair%%;*}"
-            id="${pair#*;}"
+          # ----- عناوين state (يمين) + IDs كاملة (يسار) -----
+          declare -a ADDR IDS
+
+          # RG + VNET + PIPs + NSGs (لو ما أضفتِهم قبل)
+          ADDR+=("azurerm_resource_group.rg")
+          IDS+=("${SUB}/resourceGroups/${RG}")
+
+          ADDR+=("azurerm_virtual_network.vnet")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}")
+
+          ADDR+=("azurerm_public_ip.bastion_pip")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-bastion-pip")
+
+          ADDR+=("azurerm_public_ip.appgw_pip")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-appgw-pip")
+
+          ADDR+=("azurerm_network_security_group.nsg_frontend")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-frontend-shouq")
+
+          ADDR+=("azurerm_network_security_group.nsg_backend")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-backend-shouq")
+
+          ADDR+=("azurerm_network_security_group.nsg_data")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-data-shouq")
+
+          ADDR+=("azurerm_network_security_group.nsg_mgmt")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/networkSecurityGroups/nsg-mgmt-shouq")
+
+          # ----- Subnets (for_each = var.subnets) -----
+          # keys: appgw, bastion (AzureBastionSubnet), frontend, backend, data, mgmt
+          ADDR+=("azurerm_subnet.snet[\"appgw\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/snet-appgw")
+
+          ADDR+=("azurerm_subnet.snet[\"bastion\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/AzureBastionSubnet")
+
+          ADDR+=("azurerm_subnet.snet[\"frontend\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/snet-frontend")
+
+          ADDR+=("azurerm_subnet.snet[\"backend\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/snet-backend")
+
+          ADDR+=("azurerm_subnet.snet[\"data\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/snet-data")
+
+          ADDR+=("azurerm_subnet.snet[\"mgmt\"]")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}/subnets/snet-mgmt")
+
+          # ----- SQL Server + Database -----
+          ADDR+=("azurerm_mssql_server.sqlserver")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/${SQLSRV}")
+
+          ADDR+=("azurerm_mssql_database.sqldb")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/${SQLSRV}/databases/${SQLDB}")
+
+          # ----- Private DNS Zone + VNet Link -----
+          ADDR+=("azurerm_private_dns_zone.sqlzone")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net")
+
+          ADDR+=("azurerm_private_dns_zone_virtual_network_link.sqllink")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/virtualNetworkLinks/sqlzone-vnet-link")
+
+          # ----- Web Application Firewall Policy -----
+          ADDR+=("azurerm_web_application_firewall_policy.wafpolicy")
+          IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGatewayWebApplicationFirewallPolicies/devops-proj2-shouq-waf-policy")
+
+          # ----- Loop: import if missing -----
+          for i in "${!ADDR[@]}"; do
+            addr="${ADDR[$i]}"
+            id="${IDS[$i]}"
             if terraform state show "$addr" >/dev/null 2>&1; then
               echo "✓ $addr already in state"
             else
