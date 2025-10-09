@@ -4,8 +4,10 @@ locals {
 }
 
 # Resource Group
-data "azurerm_resource_group" "rg" {
-  name = var.rg_name
+ resource "azurerm_resource_group" "rg" {
+  name     = local.rg_name
+  location = var.location
+}
 }
 
 # Virtual Network
