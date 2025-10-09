@@ -8,7 +8,7 @@ locals {
   name     = local.rg_name
   location = var.location
 }
-}
+
 
 # Virtual Network
 resource "azurerm_virtual_network" "vnet" {
