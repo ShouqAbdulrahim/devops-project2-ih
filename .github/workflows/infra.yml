@@ -36,6 +36,7 @@ jobs:
         working-directory: infra/terraform
         run: |
           set -e
+
           SUB="/subscriptions/${ARM_SUBSCRIPTION_ID}"
           RG="devops-proj2-shouq-rg"
           VNET="devops-proj2-shouq-vnet"
@@ -48,10 +49,11 @@ jobs:
 
           declare -a ADDR IDS
 
-          # --- RG + VNET + Subnets + NSGs + Rules (زي ما كانت) ---
+          # --- RG + VNET ---
           ADDR+=("azurerm_resource_group.rg"); IDS+=("${SUB}/resourceGroups/${RG}")
           ADDR+=("azurerm_virtual_network.vnet"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/virtualNetworks/${VNET}")
 
+          # --- Subnets (for_each) ---
           ADDR+=("azurerm_subnet.snet[\"appgw\"]");    IDS+=("$(sn_id snet-appgw)")
           ADDR+=("azurerm_subnet.snet[\"bastion\"]");  IDS+=("$(sn_id AzureBastionSubnet)")
           ADDR+=("azurerm_subnet.snet[\"frontend\"]"); IDS+=("$(sn_id snet-frontend)")
@@ -59,26 +61,74 @@ jobs:
           ADDR+=("azurerm_subnet.snet[\"data\"]");     IDS+=("$(sn_id snet-data)")
           ADDR+=("azurerm_subnet.snet[\"mgmt\"]");     IDS+=("$(sn_id snet-mgmt)")
 
+          # --- NSGs ---
           ADDR+=("azurerm_network_security_group.nsg_frontend"); IDS+=("$(nsg_id nsg-frontend-shouq)")
           ADDR+=("azurerm_network_security_group.nsg_backend");  IDS+=("$(nsg_id nsg-backend-shouq)")
           ADDR+=("azurerm_network_security_group.nsg_data");     IDS+=("$(nsg_id nsg-data-shouq)")
           ADDR+=("azurerm_network_security_group.nsg_mgmt");     IDS+=("$(nsg_id nsg-mgmt-shouq)")
 
+          # --- NSG Rules ---
           ADDR+=("azurerm_network_security_rule.allow_appgw_to_frontend_http"); IDS+=("$(nsg_id nsg-frontend-shouq)/securityRules/allow_appgw_to_frontend_http")
           ADDR+=("azurerm_network_security_rule.allow_appgw_to_backend_api");   IDS+=("$(nsg_id nsg-backend-shouq)/securityRules/allow_appgw_to_backend_api")
           ADDR+=("azurerm_network_security_rule.allow_mgmt_ssh_frontend");      IDS+=("$(nsg_id nsg-frontend-shouq)/securityRules/allow_mgmt_ssh_frontend")
           ADDR+=("azurerm_network_security_rule.allow_mgmt_ssh_backend");       IDS+=("$(nsg_id nsg-backend-shouq)/securityRules/allow_mgmt_ssh_backend")
           ADDR+=("azurerm_network_security_rule.allow_backend_to_sql");         IDS+=("$(nsg_id nsg-data-shouq)/securityRules/allow_backend_to_sql")
 
-          # --- Associations: ✅ Subnet ID فقط (بدون | وبدون NSG ID) ---
+          # --- Subnet <-> NSG Associations (v4: Subnet ID فقط) ---
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_frontend"); IDS+=("$(sn_id snet-frontend)")
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_backend");  IDS+=("$(sn_id snet-backend)")
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_data");     IDS+=("$(sn_id snet-data)")
           ADDR+=("azurerm_subnet_network_security_group_association.assoc_mgmt");     IDS+=("$(sn_id snet-mgmt)")
 
-          # --- PIPs / AppGW / Bastion / NICs / SQL / PE / DNS ---
+          # --- Public IPs / AppGW / Bastion ---
           ADDR+=("azurerm_public_ip.bastion_pip"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-bastion-pip")
           ADDR+=("azurerm_public_ip.appgw_pip");   IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-appgw-pip")
+          ADDR+=("azurerm_application_gateway.appgw"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGateways/devops-proj2-shouq-appgw")
+          ADDR+=("azurerm_bastion_host.bastion");      IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/bastionHosts/devops-proj2-shouq-bastion")
+
+          # --- NICs ---
+          ADDR+=("azurerm_network_interface.nic_mgmt");     IDS+=("$(nic_id devops-proj2-shouq-nic-mgmt)")
+          ADDR+=("azurerm_network_interface.nic_frontend"); IDS+=("$(nic_id devops-proj2-shouq-nic-frontend)")
+          ADDR+=("azurerm_network_interface.nic_backend");  IDS+=("$(nic_id devops-proj2-shouq-nic-backend)")
+
+          # --- SQL / Private Endpoint / DNS ---
+          ADDR+=("azurerm_mssql_server.sqlserver"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/${SQLSRV}")
+          ADDR+=("azurerm_mssql_database.sqldb");   IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Sql/servers/${SQLSRV}/databases/${SQLDB}")
+          ADDR+=("azurerm_private_endpoint.sqlpe"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateEndpoints/devops-proj2-shouq-sql-pe")
+          ADDR+=("azurerm_private_dns_zone.sqlzone"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net")
+          ADDR+=("azurerm_private_dns_zone_virtual_network_link.sqllink"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/virtualNetworkLinks/sqlzone-vnet-link")
+
+          # --- Linux VMs ---
+          ADDR+=("azurerm_linux_virtual_machine.vm_mgmt");     IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-mgmt")
+          ADDR+=("azurerm_linux_virtual_machine.vm_frontend"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-frontend")
+          ADDR+=("azurerm_linux_virtual_machine.vm_backend");  IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Compute/virtualMachines/devops-proj2-shouq-vm-backend")
+
+          # --- Private DNS A Record ---
+          ADDR+=("azurerm_private_dns_a_record.sqlrecord"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net/A/devops-proj2-shouq-sqlsrv")
+
+          # --- WAF Policy ---
+          ADDR+=("azurerm_web_application_firewall_policy.wafpolicy"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGatewayWebApplicationFirewallPolicies/devops-proj2-shouq-waf-policy")
+
+          # --- Import loop ---
+          for i in "${!ADDR[@]}"; do
+            addr="${ADDR[$i]}"
+            id="${IDS[$i]}"
+            if terraform state show "$addr" >/dev/null 2>&1; then
+              echo "✓ $addr already in state"
+            else
+              echo "→ Importing $addr"
+              terraform import "$addr" "$id"
+            fi
+          done
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -input=false tfplan          ADDR+=("azurerm_public_ip.appgw_pip");   IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/publicIPAddresses/devops-proj2-shouq-appgw-pip")
           ADDR+=("azurerm_application_gateway.appgw"); IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/applicationGateways/devops-proj2-shouq-appgw")
           ADDR+=("azurerm_bastion_host.bastion");      IDS+=("${SUB}/resourceGroups/${RG}/providers/Microsoft.Network/bastionHosts/devops-proj2-shouq-bastion")
 
